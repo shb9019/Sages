@@ -25,8 +25,10 @@ class Node(Process):
 		self.local_leaders = [] # List of all Local Leaders
 		self.number_of_clusters = 0 # Total number of clusters
 		self.all_node_info = [] # Dict of all active ports to cluster no on the network
-		self.vote_count = -1 # Vote Count if this node is a candidate
-		self.has_voted = False # True, if this node has voted during election
+		self.ll_vote_count = -1 # Vote Count if this node is a local leader candidate
+		self.cl_vote_count = -1  # Vote Count if this node is a central leader candidate
+		self.has_ll_voted = False # True, if this node has voted during election
+		self.has_cl_voted = False # True, if this node is LL and voted for a central leader
 		self.is_election = False # True, if election is happening rn. Does not accept tasks if set to true
 
 		self.serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -81,8 +83,12 @@ class Node(Process):
 	def election_handler(self):
 		while true:
 			self.is_election = True
+			self.has_ll_voted = False
+			sleep(0.1)
 			cluster_election(self)
 			self.has_voted = False
+			self.has_cl_voted = False
+			sleep(0.1)
 			network_election(self)
 			self.is_election = False
 			sleep(SESSION_TIMER)
@@ -117,24 +123,24 @@ class Node(Process):
 	# Wait for responses, if majority, send to every cluster node saying I am LL
 	# Send information to CL
 	def cluster_election(self):
-		if self.has_voted == True:
+		if self.has_ll_voted:
 			return
 		
 		# Wait for Nomination Buffer Time
 		nomination_wait_time = random.randint(Node.MIN_NOMINATION_DURATION, Node.MAX_NOMINATION_DURATION)
 		sleep(nomination_wait_time / 1000)
 
-		if self.has_voted == True:
+		if self.has_ll_voted:
 			return
 
 		# Send vote requests
 		cluster_no = self.all_node_info[self.id]
-		self.vote_count = 1
-		self.has_voted = True
+		self.ll_vote_count = 1
+		self.has_ll_voted = True
 		for key in self.all_node_info:
 			if self.all_node_info[key] == cluster_no:  # same cluster
 				self.send_data_to_node('vote_request', 'NIL', key)
-
+		
 		# Wait for everyone to send votes
 		sleep(Node.ELECTION_DURATION / 1000)
 
@@ -146,8 +152,14 @@ class Node(Process):
 
 
 	# Called when central leader sends local leader information
-	def receive_LL_info(self, local_leaders):
+	def receive_ll_info(self, local_leaders):
 		self.local_leaders = local_leaders
+
+
+	def receive_ll_vote_request(self, id):
+		if(self.has_ll_voted == False)
+			self.has_ll_voted = True
+			# Socket send vote to recipient accepting vote request.
 
 
 	# Central Leader Election
@@ -155,14 +167,35 @@ class Node(Process):
 	# Transfer cluster data to every node
 	def network_election(self):
 		if(self.local_leaders[self.all_node_info[id]] == id):
+			if self.has_cl_voted:
+				return
+			
 			nomination_wait_time = random.randint(MIN_NOMINATION_DURATION, MAX_NOMINATION_DURATION)
 			sleep(nomination_wait_time / 1000)
+
+			if self.has_cl_voted:
+				return
+
+			# Send vote requests
+			self.cl_vote_count = 1
+			self.has_cl_voted = True
+			for key, value in self.all_node_info.items():
+				if(key == self.local_leader[self.all_node_info[key]]):
+					# Socket send vote request to node
+			
+			sleep(Node.ELECTION_DURATION / 1000)
+
+			if vote_count >= (CLUSTER_COUNT // 2):
+			for key in self.all_node_info.items():
+				print(key)
+				# Socket send I am CL, fuck you
 
 
 	# Called by CL, once election is over
 	def assign_to_LL():
 		pass
-	
+
+
 	def assign_to_followers():
 		pass
 
