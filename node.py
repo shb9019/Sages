@@ -9,6 +9,9 @@ import subprocess
 import time
 import hashlib
 import socket
+import time
+
+start_port = 6000
 
 class Node(Process):
 
@@ -33,7 +36,7 @@ class Node(Process):
 	def __init__(self, node_id, default_nodes, default_local_leaders):
 		self.id = node_id # Port No a node is running on
 		self.history = [] # Set of all computations done
-		self.CL = 5000 # Central Leader of a node
+		self.CL = start_port # Central Leader of a node
 		self.LL = None # Local Leader of a node
 		self.task_queue = [] # Tasks a CL is running
 		self.no_of_tasks_queued = 0 # No of tasks a CL has iin its queue that have not been processed
@@ -144,40 +147,68 @@ class Node(Process):
 			self.is_election = True
 			self.has_ll_voted = False
 			self.has_cl_voted = False
-			sleep(1)
+			sleep(0.5)
 			
+			print(self.id, " has started election process")
 			# If CL, send tx history and cluster assignment details to all nodes
 			# If not CL, wait for some time to let every node receive data
+			
+			start_sec = int(round(time.time() * 1000))
 			if self.id == self.CL:
+				print(self.id, " is the current CL, assigning clusters")
 				self.assign_cluster()
+				print("Current cluster assignment is ", self.all_node_info)
 				for key in self.all_node_info.keys():
 					self.send_data_to_node('tx_history', self.history, key)
 					self.send_data_to_node('cluster', self.all_node_info, key)
+				end_sec = int(round(time.time() * 1000))
+				if((end_sec - start_sec) < 1000):
+					sleep((1000 - (end_sec - start_sec)) / 1000)
 			else:
-				sleep(0.2)
+				sleep(1)
 
+			print(self.id, " has synchronized data with central node")
+			print(self.id, " participating in cluster election...")
+			
+			start_sec = int(round(time.time() * 1000))
 			# Cluster Election
 			self.cluster_election()
-			
+			end_sec = int(round(time.time() * 1000))
+			if((end_sec - start_sec) < 1000):
+				sleep((1000 - (end_sec - start_sec)) / 1000)
+
+			print("Local Leader voting done for ", self.id)
+
 			# If Cluster Leader, send new local leaders to every other one
+			start_sec = int(round(time.time() * 1000))
 			if self.id == self.CL:
-				sleep(0.5)
 				for key in self.all_node_info.keys():
 					self.send_data_to_node('local_leaders', self.local_leaders, key)
+				end_sec = int(round(time.time() * 1000))
+				if((end_sec - start_sec) < 500):
+					sleep((500 - (end_sec - start_sec)) / 1000)
 			else:
-				sleep(1.5)
+				sleep(0.5)
 
-			print(self.local_leaders)
-			# Clear existing CL, do network selection
+			print("Local Leader of ", self.id, " - ", self.local_leaders[str(self.all_node_info[str(self.id)])])
+
 			self.CL = -1
+			# Clear existing CL, do network selection
+			start_sec = int(round(time.time() * 1000))
 			if self.local_leaders[str(self.all_node_info[str(self.id)])] == self.id:
-				sleep(0.5)
+				print("Local Leader ", self.id, " initiates network selection")
 				self.network_election()
+				end_sec = int(round(time.time() * 1000))
+				if((end_sec - start_sec) < 1000):
+					sleep((1000 - (end_sec - start_sec)) / 1000)
 			else:
-				sleep(0.5)
+				sleep(1)
 
+			print("Central Leader of ", self.id, " is ", self.CL)
 			# Wait for session to end
 			self.is_election = False
+
+			print("Starting next session at ", self.id, "...")
 			sleep(Node.SESSION_TIMER / 1000)
 
 
@@ -255,11 +286,9 @@ class Node(Process):
 			
 			sleep(Node.ELECTION_DURATION / 1000)
 
-			print(self.id, self.cl_vote_count)
 			if self.cl_vote_count > 1:
 				for key in self.all_node_info:
-					self.send_data_to_node('i_am_cc', self.id, key)
-
+					self.send_data_to_node('i_am_cl', self.id, key)
 
 	# Pre Election Broadcast from CL about current history
 	def receive_update_history(self, tx_history):
@@ -298,7 +327,6 @@ class Node(Process):
 	def receive_cl_vote_request(self, id):
 		if self.has_cl_voted == False and id == self.local_leaders[str(self.all_node_info[str(id)])]:
 			self.has_cl_voted = True
-			print('Voting')
 			self.send_data_to_node('cl_vote', '', str(id))
 
 
@@ -317,12 +345,12 @@ class Node(Process):
 if __name__ == '__main__':
 	n = 15  # number of processses to run in parallel
 	default_nodes = {}
-	default_local_leaders = {'0': 5000, '1': 5005, '2': 5010}
+	default_local_leaders = {'0': start_port, '1': start_port+5, '2': start_port+10}
 	for i in range(n):
-		default_nodes[str(5000+i)] = i//5
+		default_nodes[str(start_port+i)] = i//5
 	proc = []
 	for i in range(n):
-		p = Node(5000 + i, default_nodes, default_local_leaders)  # port numbers go from 5000 to 5000 + n - 1
+		p = Node(start_port + i, default_nodes, default_local_leaders)  # port numbers go from 5000 to 5000 + n - 1
 		proc.append(p)
 		p.start()
 	for p in proc:
