@@ -133,7 +133,7 @@ class Node(Process):
 				print('LL ', self.id, ' is submitting to follower ', key)
 				self.send_data_to_node('ll_to_follower_assign', data, key)
 		
-		sleep(Node.RESULT_CONFIRMATION_TIMER // 1000) # sleep till everyone sends data
+		sleep(Node.RESULT_CONFIRMATION_TIMER // 1000)  # sleep till everyone sends data
 		self.submitted_answer = 5
 		print(self.id, " calculating the total score of the answer ", self.submitted_answer)
 		# if majority agrees on the answer, then accept it.
@@ -157,7 +157,6 @@ class Node(Process):
 			self.submitted_answer += 1
 		else:
 			self.submitted_answer -= 1
-		print(self.id, self.submitted_answer, "FUCK THIS WORLD")
 
 
 
