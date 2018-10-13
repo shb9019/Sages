@@ -30,14 +30,14 @@ class Node(Process):
 		thread2.join()
 
 
-	def __init__(self, node_id, default_nodes):
+	def __init__(self, node_id, default_nodes, default_local_leaders):
 		self.id = node_id # Port No a node is running on
 		self.history = [] # Set of all computations done
 		self.CL = 5000 # Central Leader of a node
 		self.LL = None # Local Leader of a node
 		self.task_queue = [] # Tasks a CL is running
 		self.no_of_tasks_queued = 0 # No of tasks a CL has iin its queue that have not been processed
-		self.local_leaders = {} # List of all Local Leaders held by CL
+		self.local_leaders = default_local_leaders # List of all Local Leaders held by CL
 		self.number_of_clusters = 0 # Total number of clusters
 		self.all_node_info = default_nodes # Dict of all active ports to cluster no on the network
 		self.ll_vote_count = -1 # Vote Count if this node is a local leader candidate
@@ -101,11 +101,9 @@ class Node(Process):
 		while True:
 			(clientsocket, address) = self.serversocket.accept()
 			data = clientsocket.recv(1024)
-			# print(self.id, "before")
 			if not data:
 				print("Sadly, something went wrong lol")
 
-			# print([self.id, "after", data])
 			data = json.loads(data.decode())
 
 			if data['type'] == 'tx_history':
@@ -169,15 +167,15 @@ class Node(Process):
 			
 			# Clear existing CL, do network selection
 			self.CL = -1
-			# print(self.local_leaders, self.all_node_info[str(self.id)])
 			if self.local_leaders[str(self.all_node_info[str(self.id)])] == self.id:
-				self.network_election(self)
+				self.network_election()
 			else:
 				sleep(0.5)
 			
+			print("Election Done")
 			# Wait for session to end
 			self.is_election = False
-			sleep(SESSION_TIMER)
+			sleep(Node.SESSION_TIMER)
 
 
 	# Assign Cluster Ids for every node, only used by CL
@@ -213,7 +211,6 @@ class Node(Process):
 			return
 
 		# Send vote requests
-		# print(self.all_node_info)
 		cluster_no = self.all_node_info[str(self.id)]
 		self.ll_vote_count = 1
 		self.has_ll_voted = True
@@ -288,7 +285,6 @@ class Node(Process):
 	# Received information saying that ll_id is the Local Leader now
 	def receive_ll(self, ll_id):
 		if self.CL == self.id:
-			print(self.local_leaders)
 			self.local_leaders[str(self.all_node_info[str(ll_id)])] = ll_id
 		
 		if self.all_node_info[str(self.id)] == self.all_node_info[str(ll_id)]:
@@ -324,11 +320,12 @@ class Node(Process):
 if __name__ == '__main__':
 	n = 15  # number of processses to run in parallel
 	default_nodes = {}
+	default_local_leaders = {'0': 5000, '1': 5005, '2': 5010}
 	for i in range(n):
 		default_nodes[str(5000+i)] = i//5
 	proc = []
 	for i in range(n):
-		p = Node(5000 + i, default_nodes)  # port numbers go from 5000 to 5000 + n - 1
+		p = Node(5000 + i, default_nodes, default_local_leaders)  # port numbers go from 5000 to 5000 + n - 1
 		proc.append(p)
 		p.start()
 	for p in proc:
