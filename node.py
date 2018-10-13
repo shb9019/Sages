@@ -81,14 +81,12 @@ class Node(Process):
 
 	# Handles all election calls, runs on a thread
 	def election_handler(self):
-		while true:
+		while True:
 			self.is_election = True
 			self.has_ll_voted = False
-			sleep(0.1)
 			cluster_election(self)
 			self.has_voted = False
 			self.has_cl_voted = False
-			sleep(0.1)
 			network_election(self)
 			self.is_election = False
 			sleep(SESSION_TIMER)
