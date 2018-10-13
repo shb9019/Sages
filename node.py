@@ -25,7 +25,7 @@ class Node(Process):
 		self.LL = None # Local Leader of a node
 		self.task_queue = [] # Tasks a CL is running
 		self.no_of_tasks_queued = 0 # No of tasks a CL has iin its queue that have not been processed
-		self.local_leaders = [] # List of all Local Leaders
+		self.local_leaders = [] # List of all Local Leaders held by CL
 		self.number_of_clusters = 0 # Total number of clusters
 		self.all_node_info = {} # Dict of all active ports to cluster no on the network
 		self.ll_vote_count = -1 # Vote Count if this node is a local leader candidate
@@ -77,11 +77,6 @@ class Node(Process):
 		self.send_data_to_node('compute_result', sending_data, self.LL)
 
 
-	# Pre Election Broadcast from CL about current history 
-	def add_to_history(self, tx_history):
-		self.history.append(tx_history)
-
-
 	# Open socket connection listening for other nodes
 	# During Cluster Election,
 	# 	Accept from same cluster only
@@ -89,19 +84,32 @@ class Node(Process):
 	# 	Accept from other LL only if LL
 	# When not election,
 	# 	Accept from CL and LL
-	def socket_listen():
+	def socket_listen(self):
 		while True:
 			(clientsocket, address) = self.serversocket.accept()
-			data = clientsocket.recv(4096)
+			data = clientsocket.recv(1024)
 			if not data:
 				print("Sadly, something went wrong lol")
 			data = json.loads(data)
-			if data['type'] == 'cluster':
-				self.receive_cluster_info(data)
-			if data['type'] == 'vote_request':
-				self.receive_ll_vote_request(data)
-			if data['type'] == 'i_am_ll':
-				pass
+
+			if data['type'] == 'tx_history':
+				self.receive_update_history(self, data['data'])
+			elif data['type'] == 'cluster':
+				self.receive_cluster_info(self, data['data'])
+			elif data['type'] == 'll_vote_request':
+				self.receive_ll_vote_request(self, data['data'])
+			elif data['type'] == 'll_vote':
+				self.receive_ll_vote(self)
+			elif data['type'] == 'i_am_ll':
+				self.receive_ll(self, data['data'])
+			elif data['type'] == 'local_leaders':
+				self.receive_local_leaders(self, data['data'])
+			elif data['type'] == 'cl_vote_request':
+				self.receive_cl_vote_request(self, data['data'])
+			elif data['type'] == 'cl_vote':
+				self.receive_cl_vote(self)
+			elif data['type'] == 'i_am_cl':
+				self.receive_cl(self, data['data'])
 
 
 	def send_data_to_node(type_of_message, data, port):
@@ -117,13 +125,40 @@ class Node(Process):
 
 	# Handles all election calls, runs on a thread
 	def election_handler(self):
-		while True:
+		while true:
+			# Set Initial Values
 			self.is_election = True
 			self.has_ll_voted = False
-			cluster_election(self)
-			self.has_voted = False
 			self.has_cl_voted = False
-			network_election(self)
+			
+			# If CL, send tx history and cluster assignment details to all nodes
+			# If not CL, wait for some time to let every node receive data
+			if self.id == self.CL:
+				self.assign_cluster(self)
+				for key in self.all_node_info.keys():
+					self.send_data_to_node('tx_history', self.history, key)
+					self.send_data_to_node('cluster', self.all_node_info, key)
+			else:
+				sleep(0.2)
+
+			# Cluster Election
+			self.cluster_election(self)
+
+			# If Cluster Leader, send new local leaders to every other one
+			if self.id == self.CL:
+				for key in self.all_node_info.keys():
+					self.send_data_to_node('local_leaders', self.local_leaders, key)
+			else:
+				sleep(0.2)
+			
+			# Clear existing CL, do network selection
+			self.CL = -1
+			if self.local_leaders[self.all_node_info[self.id]] == self.id:
+				self.network_election(self)
+			else:
+				sleep(0.5)
+			
+			# Wait for session to end
 			self.is_election = False
 			sleep(SESSION_TIMER)
 
@@ -143,13 +178,6 @@ class Node(Process):
 		for key in self.all_node_info:
 			self.all_node_info[key] = random_assign[index]
 			index += 1
-
-		for key in self.all_node_info:
-			self.send_data_to_node('cluster', self.all_node_info, key)
-
-	# Update all node cluster info
-	def receive_cluster_info(self, all_node_info):
-		self.all_node_info = all_node_info
 
 
 	# Cluster election happens
@@ -173,28 +201,19 @@ class Node(Process):
 		self.has_ll_voted = True
 		for key in self.all_node_info:
 			if self.all_node_info[key] == cluster_no:  # same cluster
-				self.send_data_to_node('vote_request', self.id, key)
+				self.send_data_to_node('ll_vote_request', '', key)
 		
 		# Wait for everyone to send votes
 		sleep(Node.ELECTION_DURATION / 1000)
 
 		# If majority, Send to all nodes in network
-		if vote_count >= (Node.CLUSTER_COUNT // 2):
+		if vote_count > (Node.CLUSTER_COUNT // 2):
 			for key in self.all_node_info.keys():
 				if (self.all_node_info[key] == cluster_no):
-					self.send_data_to_node('i_am_ll', self.id, key)
-
-
-	# Called when central leader sends local leader information
-	def receive_ll_info(self, local_leaders):
-		self.local_leaders = local_leaders
-
-
-	# This votes for anyone who asked for a request
-	def receive_ll_vote_request(self, id):
-		if(self.has_ll_voted == False)
-			self.has_ll_voted = True
-			# Socket send vote to recipient accepting vote request.
+					self.send_data_to_node('i_am_ll', 'NIL', key)
+			self.send_data_to_node('i_am_ll', 'NIL', self.CL)
+		else:
+			sleep(0.1)
 
 
 	# Central Leader Election
@@ -225,19 +244,59 @@ class Node(Process):
 					self.send_data_to_node('i_am_cc', 'NIL', key)
 
 
-	# Called by CL, once election is over
-	def assign_to_LL():
-		pass
+	# Pre Election Broadcast from CL about current history
+	def receive_update_history(self, tx_history):
+		self.history.append(tx_history)
 
 
-	def assign_to_followers():
-		pass
+	# Update all node info
+	def receive_cluster_info(self, all_node_info):
+		self.all_node_info = all_node_info
 
-	def send_to_LL():
-		pass
-	
-	def validate_answer():
-		pass
-	
-	def send_to_CL():
-		pass
+
+	# Received a vote request from another node from same cluster, vote for it if not already voted
+	def receive_ll_vote_request(self, id):
+		if not self.has_ll_voted and self.all_node_info[id] == self.all_node_info[self.id]:
+			self.has_ll_voted = True
+			self.send_data_to_node('ll_vote', 'NIL', id)
+
+
+	# Receieved vote for this node, check if valid and update
+	def receive_ll_vote(self):
+		if self.ll_vote_count != -1:
+			self.ll_vote_count += 1
+
+
+	# Received information saying that ll_id is the Local Leader now
+	def receive_ll(self, ll_id):
+		if self.CL == self.id:
+			self.local_leaders[self.all_node_info[ll_id]] = ll_id
+		
+		if self.all_node_info[self.id] == self.all_node_info[ll_id]:
+			self.has_ll_voted = True
+			self.LL = ll_id
+
+
+	# Received list of all local leaders
+	def receive_local_leaders(self, local_leaders)
+		self.local_leaders = local_leaders
+
+
+	# Received a vote request from another local leader, vote for it if not already voted
+	def receive_cl_vote_request(self, id):
+		if not self.has_cl_voted and self.all_node_info[id] == self.local_leaders[self.all_node_info[id]]:
+			self.has_cl_voted = True
+			self.send_data_to_node('cl_vote', 'NIL', id)
+
+
+	# Receieved vote for this node, check if valid and update
+	def receive_cl_vote(self):
+		if self.cl_vote_count != -1:
+			self.cl_vote_count += 1
+
+
+	# Received information saying that cl_id is the Central Leader now
+	def receive_cl(self, cl_id):
+		if self.id == self.local_leaders[self.all_node_info[self.id]]
+			self.has_cl_voted = True
+		self.CL = cl_id
