@@ -145,6 +145,7 @@ class Node(Process):
 			self.has_ll_voted = False
 			self.has_cl_voted = False
 			sleep(1)
+			
 			# If CL, send tx history and cluster assignment details to all nodes
 			# If not CL, wait for some time to let every node receive data
 			if self.id == self.CL:
@@ -157,25 +158,24 @@ class Node(Process):
 
 			# Cluster Election
 			self.cluster_election()
-
+			
 			# If Cluster Leader, send new local leaders to every other one
 			if self.id == self.CL:
+				sleep(0.5)
 				for key in self.all_node_info.keys():
 					self.send_data_to_node('local_leaders', self.local_leaders, key)
 			else:
-				sleep(1)
-			
+				sleep(1.5)
+
 			# Clear existing CL, do network selection
 			self.CL = -1
 			if self.local_leaders[str(self.all_node_info[str(self.id)])] == self.id:
 				self.network_election()
 			else:
-				sleep(0.5)
+				sleep(1)
 			
-			print("Election Done", self.local_leaders)
 			# Wait for session to end
 			self.is_election = False
-			print(Node.SESSION_TIMER / 1000)
 			sleep(Node.SESSION_TIMER / 1000)
 
 
@@ -224,13 +224,9 @@ class Node(Process):
 
 		# If majority, Send to all nodes in network
 		if self.ll_vote_count > (Node.CLUSTER_SIZE // 2):
-			for key in self.all_node_info.keys():
-				if (self.all_node_info[str(key)] == cluster_no):
-					self.send_data_to_node('i_am_ll', self.id, key)
-			print(self.CL)
 			self.send_data_to_node('i_am_ll', self.id, self.CL)
 		else:
-			sleep(0.1)
+			sleep(2)
 
 
 	# Central Leader Election
@@ -260,9 +256,9 @@ class Node(Process):
 			
 			sleep(Node.ELECTION_DURATION / 1000)
 
-			if self.cl_vote_count >= (self.CLUSTER_SIZE // 2):
+			if self.cl_vote_count > (3 // 2):
 				for key in self.all_node_info.items():
-					self.send_data_to_node('i_am_cc', 'NIL', key)
+					self.send_data_to_node('i_am_cc', self.id, key)
 
 
 	# Pre Election Broadcast from CL about current history
@@ -290,17 +286,11 @@ class Node(Process):
 
 	# Received information saying that ll_id is the Local Leader now
 	def receive_ll(self, ll_id):
-		if self.CL == self.id:
-			self.local_leaders[str(self.all_node_info[str(ll_id)])] = ll_id
-		
-		if self.all_node_info[str(self.id)] == self.all_node_info[str(ll_id)]:
-			self.has_ll_voted = True
-			self.LL = ll_id
+		self.local_leaders[str(self.all_node_info[str(ll_id)])] = ll_id
 
 
 	# Received list of all local leaders
 	def receive_local_leaders(self, local_leaders):
-		print(self.local_leaders)
 		self.local_leaders = local_leaders
 
 
