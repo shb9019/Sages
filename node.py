@@ -5,6 +5,9 @@ from time import sleep
 import json
 from multiprocessing import Process, Pool
 from threading import Thread
+from subprocess
+import time
+import hashlib
 
 class Node(Process):
 	# Time in ms
@@ -24,7 +27,7 @@ class Node(Process):
 		self.no_of_tasks_queued = 0 # No of tasks a CL has iin its queue that have not been processed
 		self.local_leaders = [] # List of all Local Leaders
 		self.number_of_clusters = 0 # Total number of clusters
-		self.all_node_info = [] # Dict of all active ports to cluster no on the network
+		self.all_node_info = {} # Dict of all active ports to cluster no on the network
 		self.ll_vote_count = -1 # Vote Count if this node is a local leader candidate
 		self.cl_vote_count = -1  # Vote Count if this node is a central leader candidate
 		self.has_ll_voted = False # True, if this node has voted during election
@@ -36,13 +39,42 @@ class Node(Process):
 		self.serversocket.listen(10)  # upto 10 connections can be held in queue
 
 	# Create Task and send to CL
-	def submit_to_leader(task):
-		pass
+	def submit_to_leader(filename):
+		code = """"""
+		with open(filename + '.py', 'r') as f:
+			code += f.read()
+		data = {
+			'code': code,
+			'filename': filename
+		}
+		self.send_data_to_node('submission', data, self.CL)
 
 
 	# Run a Task, done by followers
-	def compute_data():
-		pass
+	def compute_data(submisison):
+		codename = submisison['filename']
+		code = submisison['code']
+		filename = hashlib.sha1(str(time.time().encode())).hexdigest()
+		with open(filename + '.py', 'w') as f:
+			f.write(code)
+		p = subprocess.Popen(['cat',  filename], stdout=subprocess.PIPE)
+		output = ""
+		out, err = p.communicate()
+		inputs = out.decode().split('\n')
+		for inp in inputs:
+			if inp:
+				proc = subprocess.Popen(['python', 'temp.py'], stdin=subprocess.PIPE)
+				out, err = proc.communicate(input=l.encode())
+				output += out + "\n"
+		with open('temp_generated', 'w') as f:
+			f.write(output)
+		proc = subprocess.Popen(['diff', temp + '_generated', temp + '_answer'], stdout=subprocess.PIPE)
+		out, err = proc.communicate()
+		sending_data = {
+			'question_id': codename,
+			'status': out == ''
+		}
+		self.send_data_to_node('compute_result', sending_data, self.LL)
 
 
 	# Pre Election Broadcast from CL about current history 
@@ -64,8 +96,12 @@ class Node(Process):
 			if not data:
 				print("Sadly, something went wrong lol")
 			data = json.loads(data)
-			if data['type'] == 'sometype':
-				# call the correct method with the right parameters
+			if data['type'] == 'cluster':
+				self.receive_cluster_info(data)
+			if data['type'] == 'vote_request':
+				self.receive_ll_vote_request(data)
+			if data['type'] == 'i_am_ll':
+				pass
 
 
 	def send_data_to_node(type_of_message, data, port):
@@ -137,7 +173,7 @@ class Node(Process):
 		self.has_ll_voted = True
 		for key in self.all_node_info:
 			if self.all_node_info[key] == cluster_no:  # same cluster
-				self.send_data_to_node('vote_request', 'NIL', key)
+				self.send_data_to_node('vote_request', self.id, key)
 		
 		# Wait for everyone to send votes
 		sleep(Node.ELECTION_DURATION / 1000)
@@ -146,7 +182,7 @@ class Node(Process):
 		if vote_count >= (Node.CLUSTER_COUNT // 2):
 			for key in self.all_node_info.keys():
 				if (self.all_node_info[key] == cluster_no):
-					self.send_data_to_node('i_am_ll', 'NIL', key)
+					self.send_data_to_node('i_am_ll', self.id, key)
 
 
 	# Called when central leader sends local leader information
@@ -154,6 +190,7 @@ class Node(Process):
 		self.local_leaders = local_leaders
 
 
+	# This votes for anyone who asked for a request
 	def receive_ll_vote_request(self, id):
 		if(self.has_ll_voted == False)
 			self.has_ll_voted = True
