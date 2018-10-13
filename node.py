@@ -167,13 +167,15 @@ class Node(Process):
 			else:
 				sleep(1.5)
 
+			print(self.local_leaders)
 			# Clear existing CL, do network selection
 			self.CL = -1
 			if self.local_leaders[str(self.all_node_info[str(self.id)])] == self.id:
+				sleep(0.5)
 				self.network_election()
 			else:
-				sleep(1)
-			
+				sleep(0.5)
+
 			# Wait for session to end
 			self.is_election = False
 			sleep(Node.SESSION_TIMER / 1000)
@@ -240,24 +242,22 @@ class Node(Process):
 			nomination_wait_time = random.randint(Node.MIN_NOMINATION_DURATION, Node.MAX_NOMINATION_DURATION)
 			sleep(nomination_wait_time / 1000)
 
+			# Send vote requests
 			if self.has_cl_voted:
 				return
 
-			# Send vote requests
+
 			self.cl_vote_count = 1
 			self.has_cl_voted = True
-			for key, value in self.all_node_info.items():
-				try:
-					if(key == self.local_leaders[str(self.all_node_info[str(key)])]):
-						self.send_data_to_node('cl_vote_request','',key)
-				except Exception as e:
-					print(self.id, "LA")
-					raise e
+			for key in self.all_node_info:
+				if(int(key) == self.local_leaders[str(self.all_node_info[str(key)])]):
+					self.send_data_to_node('cl_vote_request', self.id, key)
 			
 			sleep(Node.ELECTION_DURATION / 1000)
 
-			if self.cl_vote_count > (3 // 2):
-				for key in self.all_node_info.items():
+			print(self.id, self.cl_vote_count)
+			if self.cl_vote_count > 1:
+				for key in self.all_node_info:
 					self.send_data_to_node('i_am_cc', self.id, key)
 
 
@@ -296,9 +296,10 @@ class Node(Process):
 
 	# Received a vote request from another local leader, vote for it if not already voted
 	def receive_cl_vote_request(self, id):
-		if not self.has_cl_voted and self.all_node_info[str(id)] == self.local_leaders[str(self.all_node_info[str(id)])]:
+		if self.has_cl_voted == False and id == self.local_leaders[str(self.all_node_info[str(id)])]:
 			self.has_cl_voted = True
-			self.send_data_to_node('cl_vote', 'NIL', id)
+			print('Voting')
+			self.send_data_to_node('cl_vote', '', str(id))
 
 
 	# Receieved vote for this node, check if valid and update
