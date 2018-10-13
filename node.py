@@ -37,7 +37,7 @@ class Node(Process):
 		self.LL = None # Local Leader of a node
 		self.task_queue = [] # Tasks a CL is running
 		self.no_of_tasks_queued = 0 # No of tasks a CL has iin its queue that have not been processed
-		self.local_leaders = [] # List of all Local Leaders held by CL
+		self.local_leaders = {} # List of all Local Leaders held by CL
 		self.number_of_clusters = 0 # Total number of clusters
 		self.all_node_info = default_nodes # Dict of all active ports to cluster no on the network
 		self.ll_vote_count = -1 # Vote Count if this node is a local leader candidate
@@ -170,7 +170,7 @@ class Node(Process):
 			# Clear existing CL, do network selection
 			self.CL = -1
 			# print(self.local_leaders, self.all_node_info[str(self.id)])
-			if self.local_leaders[self.all_node_info[str(self.id)]] == self.id:
+			if self.local_leaders[str(self.all_node_info[str(self.id)])] == self.id:
 				self.network_election(self)
 			else:
 				sleep(0.5)
@@ -238,7 +238,7 @@ class Node(Process):
 	# Randomly select one central leader out of existing LLs
 	# Transfer cluster data to every node
 	def network_election(self):
-		if(self.local_leaders[self.all_node_info[str(id)]] == id):
+		if(self.local_leaders[str(self.all_node_info[str(id)])] == id):
 			if self.has_cl_voted:
 				return
 			
@@ -289,7 +289,7 @@ class Node(Process):
 	def receive_ll(self, ll_id):
 		if self.CL == self.id:
 			print(self.local_leaders)
-			self.local_leaders[self.all_node_info[str(ll_id)]] = ll_id
+			self.local_leaders[str(self.all_node_info[str(ll_id)])] = ll_id
 		
 		if self.all_node_info[str(self.id)] == self.all_node_info[str(ll_id)]:
 			self.has_ll_voted = True
@@ -304,7 +304,7 @@ class Node(Process):
 
 	# Received a vote request from another local leader, vote for it if not already voted
 	def receive_cl_vote_request(self, id):
-		if not self.has_cl_voted and self.all_node_info[str(id)] == self.local_leaders[self.all_node_info[str(id)]]:
+		if not self.has_cl_voted and self.all_node_info[str(id)] == self.local_leaders[str(self.all_node_info[str(id)])]:
 			self.has_cl_voted = True
 			self.send_data_to_node('cl_vote', 'NIL', id)
 
@@ -317,7 +317,7 @@ class Node(Process):
 
 	# Received information saying that cl_id is the Central Leader now
 	def receive_cl(self, cl_id):
-		if self.id == self.local_leaders[self.all_node_info[str(self.id)]]:
+		if self.id == self.local_leaders[str(self.all_node_info[str(self.id)])]:
 			self.has_cl_voted = True
 		self.CL = cl_id
 
