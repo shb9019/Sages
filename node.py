@@ -11,6 +11,7 @@ import hashlib
 import socket
 
 class Node(Process):
+
 	# Time in ms
 	MIN_NOMINATION_DURATION = 750 # Min Buffer Time before candidate declaration
 	MAX_NOMINATION_DURATION = 250 # Max Buffer Time before candidate declaration
@@ -18,6 +19,16 @@ class Node(Process):
 	SESSION_TIMER = 1800000 # Session duration before next election
 	RESULT_CONFIRMATION_TIMER = 60000 # Wait Time to receive submissions from all followers
 	CLUSTER_SIZE = 5 # Size of a cluster, set by default
+
+
+	def run():
+		thread1 = Thread(target = self.socket_listen, args = (self))
+		thread2 = Thread(target = self.election_handler, args = (self))
+		thread1.start()
+		thread2.start()
+		thread1.join()
+		thread2.join()
+
 
 	def __init__(self, node_id):
 		self.id = node_id # Port No a node is running on
