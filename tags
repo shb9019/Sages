@@ -1,0 +1,14 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.8	//
+END_OF_TERM	node.py	/^    END_OF_TERM = 10$/;"	v	class:Node
+NOMINATION	node.py	/^    NOMINATION = 2$/;"	v	class:Node
+Node	node.py	/^class Node:$/;"	c
+__init__	node.py	/^    def __init__(self, node_id):$/;"	m	class:Node
+asyncio	node.py	/^import asyncio$/;"	i
+compute_data	node.py	/^    def compute_data():$/;"	m	class:Node
+election_of_local_leader	node.py	/^    def election_of_local_leader():$/;"	m	class:Node
+submit_to_leader	node.py	/^    def submit_to_leader(task):$/;"	m	class:Node
