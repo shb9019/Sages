@@ -16,8 +16,8 @@ class Node(Process):
 	MAX_NOMINATION_DURATION = 750 # Max Buffer Time before candidate declaration
 	MIN_NOMINATION_DURATION = 250 # Min Buffer Time before candidate declaration
 	ELECTION_DURATION = 500 # Wait Time to receive votes
-	SESSION_TIMER = 1800000 # Session duration before next election
-	RESULT_CONFIRMATION_TIMER = 60000 # Wait Time to receive submissions from all followers
+	SESSION_TIMER = 10000 # Session duration before next election
+	RESULT_CONFIRMATION_TIMER = 6000 # Wait Time to receive submissions from all followers
 	CLUSTER_SIZE = 5 # Size of a cluster, set by default
 
 
@@ -172,10 +172,11 @@ class Node(Process):
 			else:
 				sleep(0.5)
 			
-			print("Election Done")
+			print("Election Done", self.local_leaders)
 			# Wait for session to end
 			self.is_election = False
-			sleep(Node.SESSION_TIMER)
+			print(Node.SESSION_TIMER / 1000)
+			sleep(Node.SESSION_TIMER / 1000)
 
 
 	# Assign Cluster Ids for every node, only used by CL
@@ -226,6 +227,7 @@ class Node(Process):
 			for key in self.all_node_info.keys():
 				if (self.all_node_info[str(key)] == cluster_no):
 					self.send_data_to_node('i_am_ll', self.id, key)
+			print(self.CL)
 			self.send_data_to_node('i_am_ll', self.id, self.CL)
 		else:
 			sleep(0.1)
@@ -235,11 +237,11 @@ class Node(Process):
 	# Randomly select one central leader out of existing LLs
 	# Transfer cluster data to every node
 	def network_election(self):
-		if(self.local_leaders[str(self.all_node_info[str(id)])] == id):
+		if(self.local_leaders[str(self.all_node_info[str(self.id)])] == self.id):
 			if self.has_cl_voted:
 				return
 			
-			nomination_wait_time = random.randint(MIN_NOMINATION_DURATION, MAX_NOMINATION_DURATION)
+			nomination_wait_time = random.randint(Node.MIN_NOMINATION_DURATION, Node.MAX_NOMINATION_DURATION)
 			sleep(nomination_wait_time / 1000)
 
 			if self.has_cl_voted:
@@ -249,12 +251,16 @@ class Node(Process):
 			self.cl_vote_count = 1
 			self.has_cl_voted = True
 			for key, value in self.all_node_info.items():
-				if(key == self.local_leader[self.all_node_info[str(key)]]):
-					self.send_data_to_node('cl_vote_request','',key)
+				try:
+					if(key == self.local_leaders[str(self.all_node_info[str(key)])]):
+						self.send_data_to_node('cl_vote_request','',key)
+				except Exception as e:
+					print(self.id, "LA")
+					raise e
 			
 			sleep(Node.ELECTION_DURATION / 1000)
 
-			if self.cl_vote_count >= (CLUSTER_SIZE // 2):
+			if self.cl_vote_count >= (self.CLUSTER_SIZE // 2):
 				for key in self.all_node_info.items():
 					self.send_data_to_node('i_am_cc', 'NIL', key)
 
