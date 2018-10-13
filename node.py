@@ -11,7 +11,7 @@ import hashlib
 import socket
 import time
 
-start_port = 6000
+start_port = 5000
 
 class Node(Process):
 
@@ -20,9 +20,11 @@ class Node(Process):
 	MIN_NOMINATION_DURATION = 250 # Min Buffer Time before candidate declaration
 	ELECTION_DURATION = 500 # Wait Time to receive votes
 	SESSION_TIMER = 10000 # Session duration before next election
-	RESULT_CONFIRMATION_TIMER = 6000 # Wait Time to receive submissions from all followers
+	RESULT_CONFIRMATION_TIMER = 5000 # Wait Time to receive submissions from all followers
 	CLUSTER_SIZE = 5 # Size of a cluster, set by default
 
+	node1 = 0
+	node2 = 0
 
 	def run(self):
 		thread1 = Thread(target = self.socket_listen)
@@ -38,7 +40,7 @@ class Node(Process):
 		self.history = [] # Set of all computations done
 		self.CL = start_port # Central Leader of a node
 		self.LL = None # Local Leader of a node
-		self.task_queue = [] # Tasks a CL is running
+		self.task_queue = {} # Tasks a CL is running
 		self.no_of_tasks_queued = 0 # No of tasks a CL has iin its queue that have not been processed
 		self.local_leaders = default_local_leaders # List of all Local Leaders held by CL
 		self.number_of_clusters = 0 # Total number of clusters
@@ -49,29 +51,36 @@ class Node(Process):
 		self.has_cl_voted = False # True, if this node is LL and voted for a central leader
 		self.is_election = False # True, if election is happening rn. Does not accept tasks if set to true
 
+		self.submitted_answer = 0  # This is used to count the number of followers that send the LL answer. ++ => AC  -- => Wrong
+
 		self.serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.serversocket.bind((socket.gethostname(), self.id))
 		self.serversocket.listen(20)  # upto 10 connections can be held in queue
 		super(Node, self).__init__()
 
 	# Create Task and send to CL
-	def submit_to_leader(filename):
+	def submit_to_leader(self, filename, sender_id):
+		if self.is_election == True:
+			print("Submission declined for", self.id, " as election is in progress")
+			return
 		code = """"""
 		with open(filename + '.py', 'r') as f:
 			code += f.read()
 		data = {
 			'code': code,
-			'filename': filename
+			'filename': filename,
+			'sender_id': sender_id
 		}
-		self.send_data_to_node('submission', data, self.CL)
+		print(sender_id, " is now submitting code to CL ", self.CL)
+		self.send_data_to_node('node_to_cl', data, self.CL)
 
 
 	# Run a Task, done by followers
-	def compute_data(submisison):
-		codename = submisison['filename']
+	def compute_data(self, submisison):
+		filename = submisison['filename']
 		code = submisison['code']
-		filename = hashlib.sha1(str(time.time().encode())).hexdigest()
-		with open(filename + '.py', 'w') as f:
+		codename = 'gen' + hashlib.sha1(str(time.time()).encode()).hexdigest()
+		with open(codename + '.py', 'w') as f:
 			f.write(code)
 		p = subprocess.Popen(['cat',  filename], stdout=subprocess.PIPE)
 		output = ""
@@ -79,18 +88,83 @@ class Node(Process):
 		inputs = out.decode().split('\n')
 		for inp in inputs:
 			if inp:
-				proc = subprocess.Popen(['python', 'temp.py'], stdin=subprocess.PIPE)
-				out, err = proc.communicate(input=l.encode())
-				output += out + "\n"
-		with open('temp_generated', 'w') as f:
+				proc = subprocess.Popen(['python', codename + '.py'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+				out, err = proc.communicate(input=inp.encode())
+				output += out.decode().split('\n')[0] + "\n"
+		with open(codename + '_generated', 'w') as f:
 			f.write(output)
-		proc = subprocess.Popen(['diff', temp + '_generated', temp + '_answer'], stdout=subprocess.PIPE)
+		proc = subprocess.Popen(['diff', codename + '_generated', filename + '_answer'], stdout=subprocess.PIPE)
 		out, err = proc.communicate()
 		sending_data = {
 			'question_id': codename,
-			'status': out == ''
+			'status': out.decode().split('\n')[0] == ''
 		}
-		self.send_data_to_node('compute_result', sending_data, self.LL)
+		self.send_data_to_node('compute_follower_to_ll', sending_data, submisison['ll_id'])
+
+	# This method is triggered when some guy submits a task to the leader
+	# It pushes data into it's queue and assigns this to a free LL
+	# It dequeues from the queue when the LL submits the answer back to it
+	def cl_to_ll_submission(self, data):
+		# task_queue stores ll_id => data
+		# data = {
+		# 	'code': code,
+		# 	'filename': filename,
+		# 	'sender_id': sender_id
+		# }
+		if self.no_of_tasks_queued >= (len(self.all_node_info) // Node.CLUSTER_SIZE):
+			print("All LL are processing!")
+			return
+		available_local_leader = self.local_leaders[str(self.no_of_tasks_queued)]
+		self.no_of_tasks_queued += 1
+		if available_local_leader == self.CL:
+			available_local_leader = self.local_leaders[str(self.no_of_tasks_queued)]
+			self.no_of_tasks_queued += 1
+		self.task_queue[available_local_leader] = data
+		print("CL ", self.CL, " is assigning ", available_local_leader, " the task")
+		self.send_data_to_node('cl_to_ll_assign', data, available_local_leader)
+	
+
+	# This method is triggered when the CL assigns a task to the LL
+	# It sends data to all followers of the same cluster
+	def ll_to_followers(self, data):
+		data['ll_id'] = self.id
+		for key in self.all_node_info:
+			if self.all_node_info[str(self.id)] == self.all_node_info[str(key)]:  # if they belong to the same cluster, send to these guys
+				print('LL ', self.id, ' is submitting to follower ', key)
+				self.send_data_to_node('ll_to_follower_assign', data, key)
+		
+		sleep(Node.RESULT_CONFIRMATION_TIMER // 1000) # sleep till everyone sends data
+
+		print(self.id, " calculating the total score of the answer ", self.submitted_answer)
+		# if majority agrees on the answer, then accept it.
+		if abs(self.submitted_answer) > Node.CLUSTER_SIZE // 2:
+			sending_data = {
+				'final_status': self.submitted_answer > 0,
+				'll_id': self.id
+			}
+			print(self.id, " ll submitting data to CL")
+			self.send_data_to_node('ll_to_cl_result', sending_data, key)
+	
+	
+	# This method is called when each follower submits the result of the computation back to the LL.
+	# The LL now computes the majority result and passes it back to the CL which adds it to the history
+	def majority_result(self, data):
+		print(self.id, " found answer is ", data['status'])
+		question_status = data['status']
+		if data:
+			self.submitted_answer += 1
+		else:
+			self.submitted_answer -= 1
+		print(self.id, self.submitted_answer, "FUCK THIS WORLD")
+
+
+
+	def ll_to_cl_result(self, data):
+		ll_id = data['ll_id']
+		print(self.id, " CL is has received data from LL ", ll_id, data)
+		if data['final_status']:
+			print(ll_id, " processed ", self.task_queue[ll_id]['sender_id'])
+			self.history.append((self.task_queue[ll_id]['sender_id'], self.task_queue[ll_id]['filename'], data['final_status']))
 
 
 	# Open socket connection listening for other nodes
@@ -127,6 +201,18 @@ class Node(Process):
 				self.receive_cl_vote()
 			if data['type'] == 'i_am_cl':
 				self.receive_cl(data['data'])
+
+			# code submission logic begins from here
+			if data['type'] == 'node_to_cl':
+				self.cl_to_ll_submission(data['data'])
+			if data['type'] == 'cl_to_ll_assign':
+				self.ll_to_followers(data['data'])
+			if data['type'] == 'll_to_follower_assign':
+				self.compute_data(data['data'])
+			if data['type'] == 'compute_follower_to_ll':
+				self.majority_result(data['data'])
+			if data['type'] == 'll_to_cl_result':
+				self.ll_to_cl_result(data['data'])
 
 
 	def send_data_to_node(self, type_of_message, data, port):
@@ -207,6 +293,18 @@ class Node(Process):
 			print("Central Leader of ", self.id, " is ", self.CL)
 			# Wait for session to end
 			self.is_election = False
+			self.no_of_tasks_queued = 0
+			self.submitted_answer = 0
+			# randomly select two nodes to submit tasks to the CL
+			if self.id == self.CL:
+				selected_nodes = [x for x in random.sample(self.all_node_info.keys(), 3) if x != self.CL]	
+				Node.node1, Node.node2 = random.sample(selected_nodes, 2)			
+				print(Node.node1, " and ", Node.node2, " have been selected by CL ", self.id, " to submit to it.")
+
+				print(Node.node1, " will now submit to CL")
+				self.submit_to_leader('samplecode1', Node.node1)
+				print(Node.node2, " will now submit to CL")
+				self.submit_to_leader('samplecode2', Node.node2)
 
 			print("Starting next session at ", self.id, "...")
 			sleep(Node.SESSION_TIMER / 1000)
