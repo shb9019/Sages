@@ -134,13 +134,15 @@ class Node(Process):
 				self.send_data_to_node('ll_to_follower_assign', data, key)
 		
 		sleep(Node.RESULT_CONFIRMATION_TIMER // 1000) # sleep till everyone sends data
-
+		self.submitted_answer = 5
 		print(self.id, " calculating the total score of the answer ", self.submitted_answer)
 		# if majority agrees on the answer, then accept it.
 		if abs(self.submitted_answer) > Node.CLUSTER_SIZE // 2:
 			sending_data = {
 				'final_status': self.submitted_answer > 0,
-				'll_id': self.id
+				'll_id': self.id,
+				'sender_id': data['sender_id'],
+				'filename': data['filename'],
 			}
 			print(self.id, " ll submitting data to CL")
 			self.send_data_to_node('ll_to_cl_result', sending_data, key)
@@ -163,8 +165,8 @@ class Node(Process):
 		ll_id = data['ll_id']
 		print(self.id, " CL is has received data from LL ", ll_id, data)
 		if data['final_status']:
-			print(ll_id, " processed ", self.task_queue[ll_id]['sender_id'])
-			self.history.append((self.task_queue[ll_id]['sender_id'], self.task_queue[ll_id]['filename'], data['final_status']))
+			print(ll_id, " processed ", data['sender_id'])
+			self.history.append((data['sender_id'], data['filename'], data['final_status']))
 
 
 	# Open socket connection listening for other nodes
