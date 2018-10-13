@@ -3,8 +3,10 @@ import asyncio
 import random
 from time import sleep
 import json
+from multiprocessing import Process, Pool
+from threading import Thread
 
-class Node:
+class Node(Process):
 	# Time in ms
 	MIN_NOMINATION_DURATION = 750 # Min Buffer Time before candidate declaration
 	MAX_NOMINATION_DURATION = 250 # Max Buffer Time before candidate declaration
