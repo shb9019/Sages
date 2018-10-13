@@ -2,6 +2,7 @@
 import asyncio
 import random
 from time import sleep
+import json
 
 class Node:
 	# Time in ms
@@ -51,7 +52,18 @@ class Node:
 	# 	Accept from CL and LL
 	def socket_listen():
 		pass
-	
+
+
+	def send_data_to_node(type_of_message, data, port):
+		mySocket = socket.socket()
+		sending_data = {
+			'type': type_of_message,
+			'data': data
+		}
+		sending_data = json.dumps(sending_data).encode('utf-8')
+		mySocket.connect((socket.gethostname(), port))
+		mySocket.sendall(data)
+
 
 	# Handles all election calls, runs on a thread
 	def election_handler(self):
@@ -67,20 +79,21 @@ class Node:
 	# Assign Cluster Ids for every node, only used by CL
 	def assign_cluster(self):
 		num_nodes = len(self.all_node_info)
-		num_clusters = num_nodes / CLUSTER_SIZE
+		num_clusters = num_nodes // Node.CLUSTER_SIZE
 		
 		random_assign = []
-		for x in range(0,num_clusters):
-			for y in range(0,CLUSTER_SIZE):
+		for x in range(0, num_clusters):
+			for y in range(0, Node.CLUSTER_SIZE):
 				random_assign.append(x)
 		random.shuffle(random_assign)
 		
-		for key, idx in self.all_node_info:
-			self.all_node_info[key] = random_assign[idx]
+		index = 0
+		for key in self.all_node_info:
+			self.all_node_info[key] = random_assign[index]
+			index += 1
 
-		for x in self.all_node_info:
-			print(x)
-			# Socket send new cluster info to all nodes
+		for key in self.all_node_info:
+			self.send_data_to_node('cluster', self.all_node_info, key)
 
 
 	def receive_cluster_info(self, all_node_info):
@@ -96,32 +109,28 @@ class Node:
 			return
 		
 		# Wait for Nomination Buffer Time
-		nomination_wait_time = random.randint(MIN_NOMINATION_DURATION, MAX_NOMINATION_DURATION)
+		nomination_wait_time = random.randint(Node.MIN_NOMINATION_DURATION, Node.MAX_NOMINATION_DURATION)
 		sleep(nomination_wait_time / 1000)
 
 		if self.has_voted == True:
-		
-		
-		
+			return
+
 		# Send vote requests
 		cluster_no = self.all_node_info[self.id]
 		self.vote_count = 1
 		self.has_voted = True
-		for key,value in self.all_node_info.items():
-			print(key)
-			# Socket send vote request to nodes
-		
+		for key in self.all_node_info:
+			if self.all_node_info[key] == cluster_no:  # same cluster
+				self.send_data_to_node('vote_request', 'NIL', key)
+
 		# Wait for everyone to send votes
-		sleep(ELECTION_DURATION / 1000)
+		sleep(Node.ELECTION_DURATION / 1000)
 
 		# If majority, Send to all nodes in network
-		if vote_count >= (CLUSTER_COUNT / 2):
-			for key in self.all_node_info.items():
+		if vote_count >= (Node.CLUSTER_COUNT // 2):
+			for key in self.all_node_info.keys():
 				if (self.all_node_info[key] == cluster_no):
-					print(cluster_no)
-					# Socket send I am local leader
-			
-			# Inform CL about LL
+					self.send_data_to_node('i_am_ll', 'NIL', key)
 
 
 	# Called when central leader sends local leader information
