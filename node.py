@@ -113,7 +113,7 @@ class Node(Process):
 		for key in self.all_node_info:
 			self.send_data_to_node('cluster', self.all_node_info, key)
 
-
+	# Update all node cluster info
 	def receive_cluster_info(self, all_node_info):
 		self.all_node_info = all_node_info
 
@@ -186,9 +186,8 @@ class Node(Process):
 			sleep(Node.ELECTION_DURATION / 1000)
 
 			if vote_count >= (CLUSTER_COUNT // 2):
-			for key in self.all_node_info.items():
-				print(key)
-				# Socket send I am CL, fuck you
+				for key in self.all_node_info.items():
+					self.send_data_to_node('i_am_cc', 'NIL', key)
 
 
 	# Called by CL, once election is over
