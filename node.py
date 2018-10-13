@@ -13,24 +13,24 @@ import socket
 class Node(Process):
 
 	# Time in ms
-	MIN_NOMINATION_DURATION = 750 # Min Buffer Time before candidate declaration
-	MAX_NOMINATION_DURATION = 250 # Max Buffer Time before candidate declaration
+	MAX_NOMINATION_DURATION = 750 # Max Buffer Time before candidate declaration
+	MIN_NOMINATION_DURATION = 250 # Min Buffer Time before candidate declaration
 	ELECTION_DURATION = 500 # Wait Time to receive votes
 	SESSION_TIMER = 1800000 # Session duration before next election
 	RESULT_CONFIRMATION_TIMER = 60000 # Wait Time to receive submissions from all followers
 	CLUSTER_SIZE = 5 # Size of a cluster, set by default
 
 
-	def run():
-		thread1 = Thread(target = self.socket_listen, args = (self))
-		thread2 = Thread(target = self.election_handler, args = (self))
+	def run(self):
+		thread1 = Thread(target = self.socket_listen)
+		thread2 = Thread(target = self.election_handler)
 		thread1.start()
 		thread2.start()
 		thread1.join()
 		thread2.join()
 
 
-	def __init__(self, node_id):
+	def __init__(self, node_id, default_nodes):
 		self.id = node_id # Port No a node is running on
 		self.history = [] # Set of all computations done
 		self.CL = 5000 # Central Leader of a node
@@ -39,7 +39,7 @@ class Node(Process):
 		self.no_of_tasks_queued = 0 # No of tasks a CL has iin its queue that have not been processed
 		self.local_leaders = [] # List of all Local Leaders held by CL
 		self.number_of_clusters = 0 # Total number of clusters
-		self.all_node_info = {} # Dict of all active ports to cluster no on the network
+		self.all_node_info = default_nodes # Dict of all active ports to cluster no on the network
 		self.ll_vote_count = -1 # Vote Count if this node is a local leader candidate
 		self.cl_vote_count = -1  # Vote Count if this node is a central leader candidate
 		self.has_ll_voted = False # True, if this node has voted during election
@@ -48,7 +48,7 @@ class Node(Process):
 
 		self.serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.serversocket.bind((socket.gethostname(), self.id))
-		self.serversocket.listen(10)  # upto 10 connections can be held in queue
+		self.serversocket.listen(20)  # upto 10 connections can be held in queue
 		super(Node, self).__init__()
 
 	# Create Task and send to CL
@@ -101,53 +101,56 @@ class Node(Process):
 		while True:
 			(clientsocket, address) = self.serversocket.accept()
 			data = clientsocket.recv(1024)
+			# print(self.id, "before")
 			if not data:
 				print("Sadly, something went wrong lol")
+
+			# print([self.id, "after", data])
 			data = json.loads(data)
 
 			if data['type'] == 'tx_history':
-				self.receive_update_history(self, data['data'])
-			elif data['type'] == 'cluster':
-				self.receive_cluster_info(self, data['data'])
-			elif data['type'] == 'll_vote_request':
-				self.receive_ll_vote_request(self, data['data'])
-			elif data['type'] == 'll_vote':
-				self.receive_ll_vote(self)
-			elif data['type'] == 'i_am_ll':
-				self.receive_ll(self, data['data'])
-			elif data['type'] == 'local_leaders':
-				self.receive_local_leaders(self, data['data'])
-			elif data['type'] == 'cl_vote_request':
-				self.receive_cl_vote_request(self, data['data'])
-			elif data['type'] == 'cl_vote':
-				self.receive_cl_vote(self)
-			elif data['type'] == 'i_am_cl':
-				self.receive_cl(self, data['data'])
+				self.receive_update_history(data['data'])
+			if data['type'] == 'cluster':
+				self.receive_cluster_info(data['data'])
+			if data['type'] == 'll_vote_request':
+				self.receive_ll_vote_request(data['data'])
+			if data['type'] == 'll_vote':
+				self.receive_ll_vote()
+			if data['type'] == 'i_am_ll':
+				self.receive_ll(data['data'])
+			if data['type'] == 'local_leaders':
+				self.receive_local_leaders(data['data'])
+			if data['type'] == 'cl_vote_request':
+				self.receive_cl_vote_request(data['data'])
+			if data['type'] == 'cl_vote':
+				self.receive_cl_vote()
+			if data['type'] == 'i_am_cl':
+				self.receive_cl(data['data'])
 
 
-	def send_data_to_node(type_of_message, data, port):
+	def send_data_to_node(self, type_of_message, data, port):
 		mySocket = socket.socket()
 		sending_data = {
 			'type': type_of_message,
 			'data': data
 		}
-		sending_data = json.dumps(sending_data).encode('utf-8')
+		sending_data = json.dumps(sending_data).encode()
 		mySocket.connect((socket.gethostname(), port))
-		mySocket.sendall(data)
+		mySocket.sendall(sending_data)
 
 
 	# Handles all election calls, runs on a thread
 	def election_handler(self):
-		while true:
+		while True:
 			# Set Initial Values
 			self.is_election = True
 			self.has_ll_voted = False
 			self.has_cl_voted = False
-			
+			sleep(1)
 			# If CL, send tx history and cluster assignment details to all nodes
 			# If not CL, wait for some time to let every node receive data
 			if self.id == self.CL:
-				self.assign_cluster(self)
+				self.assign_cluster()
 				for key in self.all_node_info.keys():
 					self.send_data_to_node('tx_history', self.history, key)
 					self.send_data_to_node('cluster', self.all_node_info, key)
@@ -155,7 +158,7 @@ class Node(Process):
 				sleep(0.2)
 
 			# Cluster Election
-			self.cluster_election(self)
+			self.cluster_election()
 
 			# If Cluster Leader, send new local leaders to every other one
 			if self.id == self.CL:
@@ -166,6 +169,7 @@ class Node(Process):
 			
 			# Clear existing CL, do network selection
 			self.CL = -1
+			print(self.local_leaders, self.all_node_info[self.id])
 			if self.local_leaders[self.all_node_info[self.id]] == self.id:
 				self.network_election(self)
 			else:
@@ -209,6 +213,7 @@ class Node(Process):
 			return
 
 		# Send vote requests
+		print(self.all_node_info)
 		cluster_no = self.all_node_info[self.id]
 		self.ll_vote_count = 1
 		self.has_ll_voted = True
@@ -220,7 +225,7 @@ class Node(Process):
 		sleep(Node.ELECTION_DURATION / 1000)
 
 		# If majority, Send to all nodes in network
-		if vote_count > (Node.CLUSTER_COUNT // 2):
+		if self.ll_vote_count > (Node.CLUSTER_SIZE // 2):
 			for key in self.all_node_info.keys():
 				if (self.all_node_info[key] == cluster_no):
 					self.send_data_to_node('i_am_ll', 'NIL', key)
@@ -252,7 +257,7 @@ class Node(Process):
 			
 			sleep(Node.ELECTION_DURATION / 1000)
 
-			if vote_count >= (CLUSTER_COUNT // 2):
+			if self.cl_vote_count >= (CLUSTER_SIZE // 2):
 				for key in self.all_node_info.items():
 					self.send_data_to_node('i_am_cc', 'NIL', key)
 
@@ -315,10 +320,13 @@ class Node(Process):
 		self.CL = cl_id
 
 if __name__ == '__main__':
-	n = 16  # number of processses to run in parallel
+	n = 15  # number of processses to run in parallel
+	default_nodes = {}
+	for i in range(n):
+		default_nodes[str(5000+i)] = i//5
 	proc = []
 	for i in range(n):
-		p = Node(5000 + i)  # port numbers go from 5000 to 5000 + n - 1
+		p = Node(5000 + i, default_nodes)  # port numbers go from 5000 to 5000 + n - 1
 		proc.append(p)
 		p.start()
 	for p in proc:
