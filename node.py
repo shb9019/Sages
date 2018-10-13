@@ -27,6 +27,9 @@ class Node:
 		self.has_voted = False # True, if this node has voted during election
 		self.is_election = False # True, if election is happening rn. Does not accept tasks if set to true
 
+		self.serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		self.serversocket.bind((socket.gethostname(), self.id))
+		self.serversocket.listen(10)  # upto 10 connections can be held in queue
 
 	# Create Task and send to CL
 	def submit_to_leader(task):
@@ -51,7 +54,14 @@ class Node:
 	# When not election,
 	# 	Accept from CL and LL
 	def socket_listen():
-		pass
+		while True:
+			(clientsocket, address) = self.serversocket.accept()
+			data = clientsocket.recv(4096)
+			if not data:
+				print("Sadly, something went wrong lol")
+			data = json.loads(data)
+			if data['type'] == 'sometype':
+				# call the correct method with the right parameters
 
 
 	def send_data_to_node(type_of_message, data, port):
