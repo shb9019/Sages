@@ -5,9 +5,10 @@ from time import sleep
 import json
 from multiprocessing import Process, Pool
 from threading import Thread
-from subprocess
+import subprocess
 import time
 import hashlib
+import socket
 
 class Node(Process):
 	# Time in ms
@@ -37,6 +38,7 @@ class Node(Process):
 		self.serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.serversocket.bind((socket.gethostname(), self.id))
 		self.serversocket.listen(10)  # upto 10 connections can be held in queue
+
 
 	# Create Task and send to CL
 	def submit_to_leader(filename):
@@ -235,7 +237,7 @@ class Node(Process):
 			self.has_cl_voted = True
 			for key, value in self.all_node_info.items():
 				if(key == self.local_leader[self.all_node_info[key]]):
-					# Socket send vote request to node
+					self.send_data_to_node('cl_vote_request','',key)
 			
 			sleep(Node.ELECTION_DURATION / 1000)
 
@@ -278,7 +280,7 @@ class Node(Process):
 
 
 	# Received list of all local leaders
-	def receive_local_leaders(self, local_leaders)
+	def receive_local_leaders(self, local_leaders):
 		self.local_leaders = local_leaders
 
 
@@ -297,6 +299,6 @@ class Node(Process):
 
 	# Received information saying that cl_id is the Central Leader now
 	def receive_cl(self, cl_id):
-		if self.id == self.local_leaders[self.all_node_info[self.id]]
+		if self.id == self.local_leaders[self.all_node_info[self.id]]:
 			self.has_cl_voted = True
 		self.CL = cl_id
