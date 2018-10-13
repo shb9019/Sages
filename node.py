@@ -49,7 +49,7 @@ class Node(Process):
 		self.serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.serversocket.bind((socket.gethostname(), self.id))
 		self.serversocket.listen(10)  # upto 10 connections can be held in queue
-
+		super(Node, self).__init__()
 
 	# Create Task and send to CL
 	def submit_to_leader(filename):
@@ -313,3 +313,13 @@ class Node(Process):
 		if self.id == self.local_leaders[self.all_node_info[self.id]]:
 			self.has_cl_voted = True
 		self.CL = cl_id
+
+if __name__ == '__main__':
+	n = 16  # number of processses to run in parallel
+	proc = []
+	for i in range(n):
+		p = Node(5000 + i)  # port numbers go from 5000 to 5000 + n - 1
+		proc.append(p)
+		p.start()
+	for p in proc:
+		p.join()
