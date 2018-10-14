@@ -12,7 +12,7 @@ import socket
 import time
 import sys
 
-start_port = 5000
+start_port = 6000
 
 def write_to_file(content):
 	f = open("../output.txt", "a")
@@ -243,15 +243,15 @@ class Node(Process):
 			
 			sleep(1)
 			
-			# print(self.id, " has started election process")
+			print(self.id, " has started election process")
 			# If CL, send tx history and cluster assignment details to all nodes
 			# If not CL, wait for some time to let every node receive data
 			
 			start_sec = int(round(time.time() * 1000))
 			if self.id == self.CL:
-				# print(self.id, " is the current CL, assigning clusters")
+				print(self.id, " is the current CL, assigning clusters")
 				self.assign_cluster()
-				# print("Current cluster assignment is ", self.all_node_info)
+				print("Current cluster assignment is ", self.all_node_info)
 				for key in self.all_node_info:
 					self.send_data_to_node('tx_history', self.history, key)
 					self.send_data_to_node('cluster', self.all_node_info, key)
@@ -262,8 +262,8 @@ class Node(Process):
 				sleep(2.0)
 
 			write_to_file("CA " + str(self.id) + " " + str(self.all_node_info[str(self.id)]))
-			# print(self.id, " has synchronized data with central node")
-			# print(self.id, " participating in cluster election...")
+			print(self.id, " has synchronized data with central node")
+			print(self.id, " participating in cluster election...")
 			
 			start_sec = int(round(time.time() * 1000))
 			# Cluster Election
@@ -272,7 +272,7 @@ class Node(Process):
 			if((end_sec - start_sec) < 1000):
 				sleep((1000 - (end_sec - start_sec)) / 1000)
 
-			# print("Local Leader voting done for ", self.id)
+			print("Local Leader voting done for ", self.id)
 
 			# If Cluster Leader, send new local leaders to every other one
 			start_sec = int(round(time.time() * 1000))
@@ -285,7 +285,7 @@ class Node(Process):
 			else:
 				sleep(0.5)
 
-			# print("Local Leader of ", self.id, " - ", self.local_leaders[str(self.all_node_info[str(self.id)])])
+			print("Local Leader of ", self.id, " - ", self.local_leaders[str(self.all_node_info[str(self.id)])])
 			if(self.id == self.local_leaders[str(self.all_node_info[str(self.id)])]):
 				write_to_file("LL " + str(self.id) + " " + str(self.all_node_info[str(self.id)]))
 
@@ -293,7 +293,7 @@ class Node(Process):
 			# Clear existing CL, do network selection
 			start_sec = int(round(time.time() * 1000))
 			if self.local_leaders[str(self.all_node_info[str(self.id)])] == self.id:
-				# print("Local Leader ", self.id, " initiates network selection")
+				print("Local Leader ", self.id, " initiates network selection")
 				self.network_election()
 				end_sec = int(round(time.time() * 1000))
 				if((end_sec - start_sec) < 1000):
@@ -304,7 +304,7 @@ class Node(Process):
 			if(self.id == self.CL):
 				write_to_file("CL " + str(self.CL))
 			
-			# print("Central Leader of ", self.id, " is ", self.CL)
+			print("Central Leader of ", self.id, " is ", self.CL)
 			# Wait for session to end
 			self.is_election = False
 			self.no_of_tasks_queued = 0
@@ -320,14 +320,14 @@ class Node(Process):
 				print(Node.node2, " will now submit to CL")
 				self.submit_to_leader('samplecode2', Node.node2)
 
-			# print("Starting next session at ", self.id, "...")
+			print("Starting next session at ", self.id, "...")
 			sleep(Node.SESSION_TIMER / 1000)
 
 			if(self.id == self.CL):
 				write_to_file("CR")
 
-
 	# Assign Cluster Ids for every node, only used by CL
+
 	def assign_cluster(self):
 		num_nodes = len(self.all_node_info)
 		num_clusters = num_nodes // Node.CLUSTER_SIZE
