@@ -10,8 +10,14 @@ import time
 import hashlib
 import socket
 import time
+import sys
 
 start_port = 5000
+
+def write_to_file(content):
+	f = open("../output.txt", "a")
+	f.write(content + '\n')
+	f.close()
 
 class Node(Process):
 
@@ -234,28 +240,30 @@ class Node(Process):
 			self.is_election = True
 			self.has_ll_voted = False
 			self.has_cl_voted = False
-			sleep(0.5)
 			
-			print(self.id, " has started election process")
+			sleep(1)
+			
+			# print(self.id, " has started election process")
 			# If CL, send tx history and cluster assignment details to all nodes
 			# If not CL, wait for some time to let every node receive data
 			
 			start_sec = int(round(time.time() * 1000))
 			if self.id == self.CL:
-				print(self.id, " is the current CL, assigning clusters")
+				# print(self.id, " is the current CL, assigning clusters")
 				self.assign_cluster()
-				print("Current cluster assignment is ", self.all_node_info)
-				for key in self.all_node_info.keys():
+				# print("Current cluster assignment is ", self.all_node_info)
+				for key in self.all_node_info:
 					self.send_data_to_node('tx_history', self.history, key)
 					self.send_data_to_node('cluster', self.all_node_info, key)
 				end_sec = int(round(time.time() * 1000))
-				if((end_sec - start_sec) < 1000):
-					sleep((1000 - (end_sec - start_sec)) / 1000)
+				if((end_sec - start_sec) < 2000):
+					sleep((2000 - (end_sec - start_sec)) / 1000)
 			else:
-				sleep(1)
+				sleep(2.0)
 
-			print(self.id, " has synchronized data with central node")
-			print(self.id, " participating in cluster election...")
+			write_to_file("CA " + str(self.id) + " " + str(self.all_node_info[str(self.id)]))
+			# print(self.id, " has synchronized data with central node")
+			# print(self.id, " participating in cluster election...")
 			
 			start_sec = int(round(time.time() * 1000))
 			# Cluster Election
@@ -264,7 +272,7 @@ class Node(Process):
 			if((end_sec - start_sec) < 1000):
 				sleep((1000 - (end_sec - start_sec)) / 1000)
 
-			print("Local Leader voting done for ", self.id)
+			# print("Local Leader voting done for ", self.id)
 
 			# If Cluster Leader, send new local leaders to every other one
 			start_sec = int(round(time.time() * 1000))
@@ -277,13 +285,15 @@ class Node(Process):
 			else:
 				sleep(0.5)
 
-			print("Local Leader of ", self.id, " - ", self.local_leaders[str(self.all_node_info[str(self.id)])])
+			# print("Local Leader of ", self.id, " - ", self.local_leaders[str(self.all_node_info[str(self.id)])])
+			if(self.id == self.local_leaders[str(self.all_node_info[str(self.id)])]):
+				write_to_file("LL " + str(self.id) + " " + str(self.all_node_info[str(self.id)]))
 
 			self.CL = -1
 			# Clear existing CL, do network selection
 			start_sec = int(round(time.time() * 1000))
 			if self.local_leaders[str(self.all_node_info[str(self.id)])] == self.id:
-				print("Local Leader ", self.id, " initiates network selection")
+				# print("Local Leader ", self.id, " initiates network selection")
 				self.network_election()
 				end_sec = int(round(time.time() * 1000))
 				if((end_sec - start_sec) < 1000):
@@ -291,7 +301,10 @@ class Node(Process):
 			else:
 				sleep(1)
 
-			print("Central Leader of ", self.id, " is ", self.CL)
+			if(self.id == self.CL):
+				write_to_file("CL " + str(self.CL))
+			
+			# print("Central Leader of ", self.id, " is ", self.CL)
 			# Wait for session to end
 			self.is_election = False
 			self.no_of_tasks_queued = 0
@@ -307,8 +320,11 @@ class Node(Process):
 				print(Node.node2, " will now submit to CL")
 				self.submit_to_leader('samplecode2', Node.node2)
 
-			print("Starting next session at ", self.id, "...")
+			# print("Starting next session at ", self.id, "...")
 			sleep(Node.SESSION_TIMER / 1000)
+
+			if(self.id == self.CL):
+				write_to_file("CR")
 
 
 	# Assign Cluster Ids for every node, only used by CL
@@ -443,10 +459,22 @@ class Node(Process):
 
 if __name__ == '__main__':
 	n = 15  # number of processses to run in parallel
+	
+	write_to_file("NN " + str(n))
+	write_to_file("CL " + str(start_port))
+	write_to_file("CS " + str(5))
+
 	default_nodes = {}
 	default_local_leaders = {'0': start_port, '1': start_port+5, '2': start_port+10}
+
 	for i in range(n):
 		default_nodes[str(start_port+i)] = i//5
+		write_to_file("CA " + str(start_port+i) + " " + str(i//5))
+	
+	write_to_file("LL " + str(start_port) + " 0")
+	write_to_file("LL " + str(start_port+5) + " 1")
+	write_to_file("LL " + str(start_port+10) + " 2")
+	write_to_file("CR")
 	proc = []
 	for i in range(n):
 		p = Node(start_port + i, default_nodes, default_local_leaders)  # port numbers go from 5000 to 5000 + n - 1
