@@ -12,7 +12,7 @@ A decentralized Competitive Coding platform which allows users to host contests,
  - Organizing a contest
  - Elections
  - Submissions & Evaluation
- - Validity
+ - Why this architecture?
  - Issues
 
 ## Introduction
@@ -60,4 +60,30 @@ Before the start of a contest, the contest information are broadcasted to all re
 
 ### Cluster Elections
 
-Assuming there is a cluster structure currently defined (i.e., the information of which node belongs to which cluster) and every node is aware of its own cluster, at the beginning of every session, cluster elections happens where every node in a cluster votes for the corresponding cluster's leader. 
+Assuming there is a cluster structure currently defined (i.e., the information of which node belongs to which cluster) and every node is aware of its own cluster, at the beginning of every session, cluster elections happens where every node in a cluster votes for the corresponding cluster's leader.
+
+At the beginning of a cluster election, ever node waits for a randomized amount of time before multicasting out a vote request to all nodes in the cluster asking for that node to for the *candidate* which is the sender of the vote request. Once a node chooses to be a candidate, it cannot vote for any other node and the first vote is by itself.
+
+On receiving a vote request, if the node hasn't voted for any other candidate, it votes for the first vote request it receives by sending a vote message to the candidate. On receiving a vote message, a candidate increments the number of votes it has. After voting for a node or sending vote request, the node starts an election timer, which is the max amount of time the election can last for.
+
+At the end of election period (a fixed duration), the candidate which has number of votes which is atleast half the number of nodes in the request, it sends a multicast message to all members of the cluster announcing itself as the new cluster leader and sends back a message to the existing central leader regarding the same.
+
+On receiving a leader announcement, the election timer is killed and a new session timer is started. In case no node receives majority which is known by the election timer timing out, a re-election happens. The number of re-elections depends on the distribution of the randomization algorithm choosen and also the network latencies between nodes of the cluster.
+
+On receiving the cluster leader announcement by the previous session's cluster leader, the list of pending task evaluations are sent to the new cluster leader by it. In case there is any task which is being executed by the current central leader before the start of the session, it finishes the execution of that task.
+
+### Central Elections
+
+The central elections are very similar in principle to the cluster elections. On the start of a session, the cluster elections happen. Every newly elected cluster leader sends back the results of the corresponding cluster election and announces itself as the cluster's leader. Once the current central leader has received cluster election results from every cluster in the community, it initiates a central leader election by sending out a multicast message to all central leaders in the community informing that the election has started.
+
+As in the case of cluster elections, vote requests are sent and vote replies are sent back. Upon receving majority, a node becomes the central leader and broadcasts this announcement to all nodes in the whole community. The previous central leader sends all information such as network status, cluster information, submissions status, leaderboard, pending submissions in the queue etc. All other nodes in the network must wait for a specific interval to wait for this handoff to complete.
+
+## Submissions and Evaluation
+
+When a node in the community wants to submit a solution to a specific problem, the code is wrapped as a task along with other information such as the sending node, problem id, input test cases, submission time etc and is sent to the central leader.
+
+The central node upon receiving a submission stores the submission data most importantly the sending node address. The cluster with the lowest workload i.e., the smallest number of pending submissions, is chosen and the task is sent storing the cluster id correspondingly. An evaluation timer is set once the task is sent to a cluster leader on expiration of which another cluster is chosen to evaluate.
+
+The cluster leader upon receiving a task, sends this to all its subordinates in the cluster for evaluation. The node which receives a task to evaluate, compiles, executes and sends back the result to the cluster leader. The cluster leader keeps track of the results from each subordinate and in case there is no result which is sent by the majority of the subordinates a failure message is sent back to the central leader, which sends this task to another cluster.
+
+During elections, tasks are submitted to the previous session's central leader. To the submitting nodes, the process is the exact same as it was in the previous session. Until the new leader is elected, the previous leader should do its job.
