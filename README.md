@@ -14,6 +14,7 @@ A decentralized Competitive Coding platform which allows users to host contests,
  - Submissions & Evaluation
  - Why this architecture?
  - Issues
+ - Progress
  - Contributors
 
 ## Introduction
@@ -138,6 +139,15 @@ There is nothing that can be done, we have lost the data :)
 ### 10. What happens if a node sends out leader announcement messages without actually being elected as the leader?
 The newly elected cluster leader must also send the corresponding list of nodes which voted for it. In case a node finds out that it hasn't voted for the cluster leader but it's address has been included or there are less than 51% of nodes voting for that cluster leader, it can start a new election round immediately.
 
+## Progress
+
+ - [ ] Ideation
+ - [ ] Peer Network System
+ - [ ] Elections
+ - [ ] Contest Registrations
+ - [ ] Problem Submissions
+ - [ ] Handling Node Failures
+ - [ ] Security Issues
 
 ## Contributors
 
