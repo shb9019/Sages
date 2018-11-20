@@ -6,16 +6,16 @@ A decentralized Competitive Coding platform which allows users to host contests,
 
 ## Table of contents
 
- - Introduction
- - Why decentralize?
- - Working Principle
- - Organizing a contest
- - Elections
- - Submissions & Evaluation
- - Why this architecture?
- - Issues
- - Progress
- - Contributors
+ - [Introduction](#introduction)
+ - [Why decentralize?](#why-decentralize?)
+ - [Working Principle](#working-principle)
+ - [Organizing contest](#organizing-contest)
+ - [Elections](#elections)
+ - [Submissions and Evaluation](#submissions-and-evaluation)
+ - [Why this architecture?](#why-this-architecture?)
+ - [Issues](#issues)
+ - [Progress](#progress)
+ - [Contributors](#contributors)
 
 ## Introduction
 
@@ -44,7 +44,7 @@ The cluster leader will in turn submit the problem to all *subordinates* in its 
 
 The central leader stores the submission result and passes on the data to the node which requested the evaluation (Note: The node which has requested the evaluation can also be the one evaluating).
 
-## Organizing a contest
+## Organizing contest
 
 Every contest starts with a set of *sage* nodes which belongs to the contest organizers. Any node which wants to register for the contest sends a registration request to one of the sage nodes which then sends the confirmation or rejection reply along with the contest details and current community information. The sage nodes communicate with each other keeping track of all the registrations for the contest.
 
