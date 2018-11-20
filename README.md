@@ -1,5 +1,5 @@
 
-# DVerify
+# SAGES
 A decentralized Competitive Coding platform which allows users to host contests, join contests, write code and submit codes with no central point of authority or failure.
 
 *Under Ideation and Development*
@@ -14,6 +14,7 @@ A decentralized Competitive Coding platform which allows users to host contests,
  - Submissions & Evaluation
  - Why this architecture?
  - Issues
+ - Contributors
 
 ## Introduction
 
@@ -78,6 +79,8 @@ The central elections are very similar in principle to the cluster elections. On
 
 As in the case of cluster elections, vote requests are sent and vote replies are sent back. Upon receving majority, a node becomes the central leader and broadcasts this announcement to all nodes in the whole community. The previous central leader sends all information such as network status, cluster information, submissions status, leaderboard, pending submissions in the queue etc. All other nodes in the network must wait for a specific interval to wait for this handoff to complete.
 
+The central leader also has the responsibility of creating the new cluster configuration for the next session. If the geographic distribution of nodes is large, it is better to assign clusters based on the region to reduce the communication latency.
+
 ## Submissions and Evaluation
 
 When a node in the community wants to submit a solution to a specific problem, the code is wrapped as a task along with other information such as the sending node, problem id, input test cases, submission time etc and is sent to the central leader.
@@ -87,3 +90,56 @@ The central node upon receiving a submission stores the submission data most imp
 The cluster leader upon receiving a task, sends this to all its subordinates in the cluster for evaluation. The node which receives a task to evaluate, compiles, executes and sends back the result to the cluster leader. The cluster leader keeps track of the results from each subordinate and in case there is no result which is sent by the majority of the subordinates a failure message is sent back to the central leader, which sends this task to another cluster.
 
 During elections, tasks are submitted to the previous session's central leader. To the submitting nodes, the process is the exact same as it was in the previous session. Until the new leader is elected, the previous leader should do its job.
+
+## Why this architecture?
+
+### Concept of clusters
+The submissions made by every node must be executed by at least one node. If we assume that a submission from one node is evaluated by exactly one other node, there is a possibility of mailicious node which gives wrong answers to all submissions. To avoid this, there is only one solution to this which is instead of trusting a single node, we redundantly send this task to multiple nodes and selecting the majority answer. Though this does increase the amount of computation done, it ensures that the submissions are evaluated correctly. The number of nodes in a cluster can be parameterized to acheive a balance between the load and the accuracy.
+
+### Elections
+Having a single leader throughout the contest duration is not ideal since there is a possibility of the node acting malicious and manipulating the submission results being sent.
+
+### Sages
+Before the start of a contest, it is usually not expected of a node to be online so there is a necessity of having a couple of nodes which are guaranteed to be online and can be a authorized point of communication. Also, to get connected to a community, it is necessary to connect to at least one node in the community. Being decentralized, it is natural to have a set of seed peers to connect to and slowly discover other peers in the network.
+
+## Issues
+
+### 1. What happens when a subordinate node goes offline?
+Every cluster leader sends a heartbeat message regularly to every node in the cluster. In case the cluster leader does not receive a heartbeat echo message from the node, the node is assumed to be dead. If a node comes back live, it sends back a heartbeat echo with no solicitation to the corresponding cluster leader.
+
+In case the node comes live in another session, the heartbeat echo is sent to the cluster leader that existed when it was live, if the node the echo message is sent to is not the current cluster leader, a reply is sent back with the current cluster leader.
+
+If there is no response for the heartbeat echo sent, a request to one of the sages is sent asking for the central leader address and further asks the central leader for it's cluster leader.
+
+### 2. What happens when a cluster leader goes offline?
+Every node in a cluster have a heartbeat timer which is the time before which it must receive a heartbeat from the cluster leader. If not received, a new election starts by sending out vote requests. The central leader also tracks the liveliness of the cluster leaders using corresponding heartbeats. Upon receiving any message from a cluster leader, the heartbeat timer is reset.
+
+### 3. What happens when the central leader goes offline?
+Similar to the case when a cluster leader fails, a new election is started.
+
+### 4. What happens when a subordinate node behaves malicious?
+Due to redundancy of task evaluated, even if a node does act malicious and submits wrong results there are other nodes which act rightfully. Since the chances of having wrong result by maliciously acting subordinate nodes is only when majority of nodes in a cluster are malicious. And the probability of a node being in a cluster is 1/(the number of clusters). It is possible to control the contest and giving out wrong submissions is only when at least 51% of the community consists of the attacker's nodes.
+
+### 5. What happens when a cluster leader behaves malicious?
+I haven't given this much thought yet, but one of the solutions is to send a verification problem as a task to check if the cluster leader isn't acting malicious.
+
+### 6. What happens when the central leader behaves malicious?
+Open to suggestions :)
+
+### 7. What happens if any node is behind a NAT?
+Assuming every node has a unique public address, this shouldn't be an issue.
+
+### 8. What happens if a node sends a authoritarian message such as tasks etc acting to be a cluster leader or central leader?
+The messages are signed by the sending node using it's private key which can only be verified by it's own public key. This way we can ensure that a node is actually from the corresponding sender.
+
+### 9. What happens if all nodes of the community goes offline?
+There is nothing that can be done, we have lost the data :)
+
+### 10. What happens if a node sends out leader announcement messages without actually being elected as the leader?
+The newly elected cluster leader must also send the corresponding list of nodes which voted for it. In case a node finds out that it hasn't voted for the cluster leader but it's address has been included or there are less than 51% of nodes voting for that cluster leader, it can start a new election round immediately.
+
+
+## Contributors
+
+ - [Akshay Pai](https://github.com/PaiAkshay998)
+ - [Sai Hemanth B](https://github.com/shb9019)
