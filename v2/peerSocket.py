@@ -12,11 +12,11 @@ class PeerSocket(object):
 
     async def server(self, websocket, path):
         data = await websocket.recv()
-        await self.message_handler(data)
+        message = json.loads(data)
+        await self.message_handler(message)
 
     async def send(self, destination, message):
         json_message = json.dumps(message)
-        print(json_message)
         async with websockets.connect(destination) as websocket:
             await websocket.send(json_message)
 
@@ -25,5 +25,4 @@ class PeerSocket(object):
         asyncio.set_event_loop(asyncio.new_event_loop())
         start_server = websockets.serve(self.server, 'localhost', self.port)
         asyncio.get_event_loop().run_until_complete(start_server)
-        # Run the server forever
         asyncio.get_event_loop().run_forever()

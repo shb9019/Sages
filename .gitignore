@@ -2,3 +2,5 @@ tags
 !tags/
 *.vscode
 *.pyc
+*.history
+*__pycache__
