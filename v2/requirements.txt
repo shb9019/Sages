@@ -1,2 +1,2 @@
-websockets==7.0
+websockets==9.1
 ecdsa==0.13.3
